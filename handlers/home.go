@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -24,5 +25,5 @@ func (h *Home) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.l.Printf("data-> %s", data)
-	w.Write(data)
+	fmt.Fprintf(w, "Hello %s", data)
 }
