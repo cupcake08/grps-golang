@@ -3,6 +3,7 @@ package data
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 )
@@ -25,6 +26,8 @@ func (p *Product) FromJSON(r io.Reader) error {
 
 type Products []*Product
 
+var DeleteError = fmt.Errorf("Unable to Delete")
+
 func (p *Products) ToJSON(w io.Writer) error {
 	encoder := json.NewEncoder(w)
 	return encoder.Encode(p)
@@ -37,7 +40,21 @@ func AddProduct(p *Product) {
 	p.ID = GetID()
 	productList = append(productList, p)
 }
-
+func DeleteProduct(id int) error {
+	prod, err := FindById(id)
+	if err != nil {
+		return DeleteError
+	}
+	for i, pr := range productList {
+		if pr.ID == prod.ID {
+			productList[i] = productList[len(productList)-1]
+			productList[len(productList)-1] = nil
+			productList = productList[:len(productList)-1]
+			break
+		}
+	}
+	return nil
+}
 func FindById(id int) (*Product, error) {
 	for _, prod := range productList {
 		if prod.ID == uint(id) {
