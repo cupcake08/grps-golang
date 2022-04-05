@@ -130,6 +130,7 @@ func (p *Products) deleteProduct(id int, rw http.ResponseWriter, r *http.Request
 	p.l.Println("Handle DELETE Product")
 	if err := data.DeleteProduct(id); err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
 	}
 	rw.Write([]byte("Successfully deleted. :)"))
 }
