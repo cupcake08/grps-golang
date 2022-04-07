@@ -9,25 +9,46 @@ import (
 	"time"
 
 	"github.com/cupcake08/grps-golang/handlers"
+	"github.com/gorilla/mux"
 )
 
 func main() {
 	l := log.New(os.Stdout, "grps-go", log.LstdFlags)
 	//make a handler
-	hh := handlers.NewHome(l)
-	gh := handlers.NewGoodBye(l)
+	// hh := handlers.NewHome(l)
+	//gh := handlers.NewGoodBye(l)
 	ph := handlers.NewProducts(l)
 
 	//register that handler with server
-	sm := http.NewServeMux()
-	sm.Handle("/", hh)
-	sm.Handle("/bye", gh)
-	sm.Handle("/products/", ph)
+	r := mux.NewRouter()
+	router := r.PathPrefix("/products").Subrouter()
+	router.Headers("Content-Type", "application/(text|json)")
 
+	//Get methods Router
+	getRoute := router.Methods(http.MethodGet).Subrouter()
+	//Post methods router
+	postRoute := router.Methods(http.MethodPost).Subrouter()
+	//Put methods router
+	putRoute := router.Methods(http.MethodPut).Subrouter()
+	putRoute.Use(ph.Middleware)
+	//Delete methods router
+	deleteRoute := router.Methods(http.MethodDelete).Subrouter()
+
+	//Get Methods
+	getRoute.HandleFunc("", ph.GetProducts)
+
+	//post Methods
+	postRoute.HandleFunc("", ph.AddProduct)
+
+	//put methods
+	putRoute.HandleFunc("/{id:[0-9]+}", ph.UpdateProduct)
+
+	//delete Methods
+	deleteRoute.HandleFunc("/{id:[0-9]+}", ph.DeleteProduct)
 	//creating our custom server
 	s := &http.Server{
 		Addr:         ":8080",
-		Handler:      sm,
+		Handler:      router,
 		IdleTimeout:  100 * time.Second,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 1 * time.Second,
@@ -40,14 +61,14 @@ func main() {
 		}
 	}()
 	//os signal
-	schan := make(chan os.Signal)
+	schan := make(chan os.Signal, 1)
 	signal.Notify(schan, os.Interrupt)
-	signal.Notify(schan, os.Kill)
 
-	sgn := <-schan
-	l.Println("Received terminate, graceful shutdown", sgn)
+	<-schan
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	s.Shutdown(ctx)
+	log.Println("Shuting down")
+	os.Exit(0)
 }

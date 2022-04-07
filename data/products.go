@@ -40,6 +40,21 @@ func AddProduct(p *Product) {
 	p.ID = GetID()
 	productList = append(productList, p)
 }
+func UpdateProduct(id uint, prod *Product) error {
+	for _, p := range productList {
+		if p.ID == id {
+			p.ID = prod.ID
+			p.Name = prod.Name
+			p.CreatedOn = prod.CreatedOn
+			p.DeletedOn = prod.DeletedOn
+			p.Description = prod.Description
+			p.Price = prod.Price
+			p.SKU = prod.SKU
+			return nil
+		}
+	}
+	return errors.New("unable to update product")
+}
 func DeleteProduct(id int) error {
 	prod, err := FindById(id)
 	if err != nil {

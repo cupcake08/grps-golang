@@ -1,12 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"log"
 	"net/http"
-	"regexp"
 	"strconv"
 
 	"github.com/cupcake08/grps-golang/data"
+	"github.com/gorilla/mux"
 )
 
 type Products struct {
@@ -15,65 +16,6 @@ type Products struct {
 
 func NewProducts(l *log.Logger) *Products {
 	return &Products{l}
-}
-
-func (p *Products) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		p.GetProducts(w, r)
-		return
-	}
-
-	if r.Method == http.MethodPost {
-		p.AddProduct(w, r)
-		return
-	}
-
-	if r.Method == http.MethodPut {
-		//extract id from path
-		p.l.Println("extracting id...")
-		id := extractId(w, r)
-		if id == -1 {
-			http.Error(w, "invalid url", http.StatusBadRequest)
-			return
-		}
-		p.l.Println("got id", id)
-		p.UpdateProduct(id, w, r)
-		return
-	}
-	if r.Method == http.MethodDelete {
-		id := extractId(w, r)
-		if id == -1 {
-			http.Error(w, "invalid url", http.StatusBadRequest)
-			return
-		}
-		//delete product method
-		p.deleteProduct(id, w, r)
-		return
-	}
-	//catch all other methods
-	w.WriteHeader(http.StatusMethodNotAllowed)
-}
-
-func extractId(w http.ResponseWriter, r *http.Request) int {
-	reg := regexp.MustCompile("/([0-9]+)")
-	g := reg.FindAllStringSubmatch(r.URL.Path, -1)
-
-	if len(g) != 1 {
-		http.Error(w, "invalid url", http.StatusBadRequest)
-		return -1
-	}
-	if len(g[0]) != 2 {
-		http.Error(w, "invalid url", http.StatusBadRequest)
-		return -1
-	}
-
-	idString := g[0][1]
-	id, err := strconv.Atoi(idString)
-	if err != nil {
-		http.Error(w, "invalid url", http.StatusBadRequest)
-		return -1
-	}
-	return id
 }
 
 func (p *Products) GetProducts(rw http.ResponseWriter, r *http.Request) {
@@ -99,38 +41,46 @@ func (p *Products) AddProduct(rw http.ResponseWriter, r *http.Request) {
 	rw.Write([]byte("Product added succesfully. :)"))
 }
 
-func (p *Products) UpdateProduct(id int, rw http.ResponseWriter, r *http.Request) {
+func (p *Products) UpdateProduct(rw http.ResponseWriter, r *http.Request) {
 	p.l.Println("Handle PUT Product")
-
-	prod, err := data.FindById(id)
-
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusNotFound)
+		http.Error(rw, "unable to get valid id", http.StatusBadRequest)
 		return
 	}
-
-	d := &data.Product{}
-	if err = d.FromJSON(r.Body); err != nil {
-		http.Error(rw, "unable to unmarshal json", http.StatusBadRequest)
-		return
-	}
-
-	prod.ID = d.ID
-	prod.Name = d.Name
-	prod.Price = d.Price
-	prod.Description = d.Description
-	prod.CreatedOn = d.CreatedOn
-	prod.DeletedOn = d.DeletedOn
-	prod.UpdatedOn = d.UpdatedOn
-
+	prod := r.Context().Value(KeyProduct{}).(*data.Product)
+	data.UpdateProduct(uint(id), prod)
 	rw.Write([]byte("Product Updated Successfully. :)"))
 }
 
-func (p *Products) deleteProduct(id int, rw http.ResponseWriter, r *http.Request) {
+func (p *Products) DeleteProduct(rw http.ResponseWriter, r *http.Request) {
 	p.l.Println("Handle DELETE Product")
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(rw, "unable to get valid id", http.StatusBadRequest)
+		return
+	}
 	if err := data.DeleteProduct(id); err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 	rw.Write([]byte("Successfully deleted. :)"))
+}
+
+type KeyProduct struct{}
+
+//middleware
+func (p *Products) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println(r.RequestURI)
+		//do stuff here
+		data := &data.Product{}
+		if err := data.FromJSON(r.Body); err != nil {
+			http.Error(w, "unable to unmarshal json", http.StatusBadRequest)
+			return
+		}
+		ctx := r.Context().Value(KeyProduct{}).(context.Context)
+		req := r.WithContext(ctx)
+		next.ServeHTTP(w, req)
+	})
 }
