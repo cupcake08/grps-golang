@@ -30,12 +30,7 @@ func (p *Products) GetProducts(rw http.ResponseWriter, r *http.Request) {
 
 func (p *Products) AddProduct(rw http.ResponseWriter, r *http.Request) {
 	p.l.Println("Handle POST Product")
-	d := &data.Product{}
-
-	if err := d.FromJSON(r.Body); err != nil {
-		http.Error(rw, "unable to unmarshal data", http.StatusBadRequest)
-		return
-	}
+	d := r.Context().Value(KeyProduct{}).(*data.Product)
 	p.l.Printf("Product: %#v", d)
 	data.AddProduct(d)
 	rw.Write([]byte("Product added succesfully. :)"))
@@ -60,7 +55,7 @@ func (p *Products) DeleteProduct(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "unable to get valid id", http.StatusBadRequest)
 		return
 	}
-	if err := data.DeleteProduct(id); err != nil {
+	if err := data.DeleteProduct(uint(id)); err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -73,14 +68,20 @@ type KeyProduct struct{}
 func (p *Products) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.RequestURI)
-		//do stuff here
-		data := &data.Product{}
-		if err := data.FromJSON(r.Body); err != nil {
+		prod := &data.Product{}
+		if err := prod.FromJSON(r.Body); err != nil {
 			http.Error(w, "unable to unmarshal json", http.StatusBadRequest)
 			return
 		}
-		ctx := r.Context().Value(KeyProduct{}).(context.Context)
-		req := r.WithContext(ctx)
-		next.ServeHTTP(w, req)
+		//validate the product
+		if err := prod.Validator(); err != nil {
+			p.l.Println("[ERROR]: ", err)
+			http.Error(w, "unable to validate product", http.StatusBadRequest)
+			return
+		}
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, KeyProduct{}, prod)
+		r = r.WithContext(ctx)
+		next.ServeHTTP(w, r)
 	})
 }

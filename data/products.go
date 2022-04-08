@@ -5,15 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 )
 
 type Product struct {
 	ID          uint    `json:"id"`
-	Name        string  `json:"name"`
+	Name        string  `json:"name" validate:"required"`
 	Description string  `json:"description"`
-	Price       float32 `json:"price"`
-	SKU         string  `json:"sku"`
+	Price       float32 `json:"price" validate:"gt=0,required"`
+	SKU         string  `json:"sku" validate:"required,sku"`
 	CreatedOn   string  `json:"-"`
 	UpdatedOn   string  `json:"-"`
 	DeletedOn   string  `json:"-"`
@@ -23,10 +26,22 @@ func (p *Product) FromJSON(r io.Reader) error {
 	decoder := json.NewDecoder(r)
 	return decoder.Decode(p)
 }
+func skuValidation(fl validator.FieldLevel) bool {
+	rg := regexp.MustCompile("[a-z]+-[a-z]+-[a-z]")
+	matches := rg.FindAllString(fl.Field().String(), -1)
+	return len(matches) == 1
+}
+
+func (p *Product) Validator() error {
+	v := validator.New()
+	//custom validator
+	v.RegisterValidation("sku", skuValidation)
+	return v.Struct(p)
+}
 
 type Products []*Product
 
-var DeleteError = fmt.Errorf("Unable to Delete")
+var ErrDeleteError = fmt.Errorf("unable to delete")
 
 func (p *Products) ToJSON(w io.Writer) error {
 	encoder := json.NewEncoder(w)
@@ -55,13 +70,9 @@ func UpdateProduct(id uint, prod *Product) error {
 	}
 	return errors.New("unable to update product")
 }
-func DeleteProduct(id int) error {
-	prod, err := FindById(id)
-	if err != nil {
-		return DeleteError
-	}
+func DeleteProduct(id uint) error {
 	for i, pr := range productList {
-		if pr.ID == prod.ID {
+		if pr.ID == id {
 			productList[i] = productList[len(productList)-1]
 			productList[len(productList)-1] = nil
 			productList = productList[:len(productList)-1]
@@ -70,14 +81,7 @@ func DeleteProduct(id int) error {
 	}
 	return nil
 }
-func FindById(id int) (*Product, error) {
-	for _, prod := range productList {
-		if prod.ID == uint(id) {
-			return prod, nil
-		}
-	}
-	return &Product{}, errors.New("no match found")
-}
+
 func GetID() uint {
 	last := productList[len(productList)-1].ID
 	return last + 1

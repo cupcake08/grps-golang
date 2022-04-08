@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	l := log.New(os.Stdout, "grps-go", log.LstdFlags)
+	l := log.New(os.Stdout, "grps-go ", log.LstdFlags)
 	//make a handler
 	// hh := handlers.NewHome(l)
 	//gh := handlers.NewGoodBye(l)
@@ -28,6 +28,7 @@ func main() {
 	getRoute := router.Methods(http.MethodGet).Subrouter()
 	//Post methods router
 	postRoute := router.Methods(http.MethodPost).Subrouter()
+	postRoute.Use(ph.Middleware)
 	//Put methods router
 	putRoute := router.Methods(http.MethodPut).Subrouter()
 	putRoute.Use(ph.Middleware)
