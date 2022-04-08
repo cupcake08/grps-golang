@@ -1,3 +1,19 @@
+// Package classification of Product API
+//
+// Documentation for Product API
+//
+// Schemas: http
+// BasePath: /
+// Version: 1.0.0
+//
+// Consumes:
+// - application/json
+//
+// Produces:
+// - application/(text|json)
+//
+// swagger:meta
+
 package main
 
 import (
@@ -8,7 +24,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/cupcake08/grps-golang/handlers"
+	prohandlers "github.com/cupcake08/grps-golang/handlers"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
@@ -17,7 +34,7 @@ func main() {
 	//make a handler
 	// hh := handlers.NewHome(l)
 	//gh := handlers.NewGoodBye(l)
-	ph := handlers.NewProducts(l)
+	ph := prohandlers.NewProducts(l)
 
 	//register that handler with server
 	r := mux.NewRouter()
@@ -46,10 +63,13 @@ func main() {
 
 	//delete Methods
 	deleteRoute.HandleFunc("/{id:[0-9]+}", ph.DeleteProduct)
+
+	//creating cors handler
+	ch := handlers.CORS(handlers.AllowedOrigins([]string{"*"}))
 	//creating our custom server
 	s := &http.Server{
 		Addr:         ":8080",
-		Handler:      router,
+		Handler:      ch(r),
 		IdleTimeout:  100 * time.Second,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 1 * time.Second,
